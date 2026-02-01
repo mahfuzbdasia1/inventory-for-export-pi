@@ -43,62 +43,51 @@ const App: React.FC = () => {
     return localStorage.getItem('soleerp_auth') === 'true';
   });
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('soleerp_user_obj');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('soleerp_user_obj');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
-  // Load initial state
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('soleerp_users');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
-  const [staffRoles, setStaffRoles] = useState<StaffRole[]>(() => {
-    const saved = localStorage.getItem('soleerp_staff_roles');
-    return saved ? JSON.parse(saved) : [
-      { id: 'r1', name: 'Store Manager', accessLevel: 'MANAGER' },
-      { id: 'r2', name: 'Sales Executive', accessLevel: 'SELLER' },
-      { id: 'r3', name: 'System Admin', accessLevel: 'ADMIN' },
-    ];
-  });
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('soleerp_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
-  const [stock, setStock] = useState<StockItem[]>(() => {
-    const saved = localStorage.getItem('soleerp_stock');
-    return saved ? JSON.parse(saved) : INITIAL_STOCK;
-  });
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem('soleerp_sales');
-    return saved ? JSON.parse(saved) : MOCK_SALES;
-  });
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('soleerp_expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>(() => {
-    const saved = localStorage.getItem('soleerp_salaries');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [showrooms, setShowrooms] = useState<Showroom[]>(() => {
-    const saved = localStorage.getItem('soleerp_showrooms');
-    return saved ? JSON.parse(saved) : SHOWROOMS;
-  });
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('soleerp_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
+  // Helper to safely load array data from localStorage
+  const loadArray = <T,>(key: string, defaultValue: T[]): T[] => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (!saved) return defaultValue;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  };
+
+  const [users, setUsers] = useState<User[]>(() => loadArray('soleerp_users', MOCK_USERS));
+  
+  const [staffRoles, setStaffRoles] = useState<StaffRole[]>(() => loadArray('soleerp_staff_roles', [
+    { id: 'r1', name: 'Store Manager', accessLevel: 'MANAGER' },
+    { id: 'r2', name: 'Sales Executive', accessLevel: 'SELLER' },
+    { id: 'r3', name: 'System Admin', accessLevel: 'ADMIN' },
+  ]));
+
+  const [products, setProducts] = useState<Product[]>(() => loadArray('soleerp_products', INITIAL_PRODUCTS));
+  const [stock, setStock] = useState<StockItem[]>(() => loadArray('soleerp_stock', INITIAL_STOCK));
+  const [sales, setSales] = useState<Sale[]>(() => loadArray('soleerp_sales', MOCK_SALES));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadArray('soleerp_expenses', []));
+  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>(() => loadArray('soleerp_salaries', []));
+  const [showrooms, setShowrooms] = useState<Showroom[]>(() => loadArray('soleerp_showrooms', SHOWROOMS));
+  const [categories, setCategories] = useState<Category[]>(() => loadArray('soleerp_categories', INITIAL_CATEGORIES));
+
   const [vatRate, setVatRate] = useState<number>(() => {
     const saved = localStorage.getItem('soleerp_vat_rate');
-    return saved ? JSON.parse(saved) : 5;
+    return saved ? Number(JSON.parse(saved)) : 5;
   });
   const [appName, setAppName] = useState<string>(() => {
-    const saved = localStorage.getItem('soleerp_app_name');
-    return saved || 'SoleERP';
+    return localStorage.getItem('soleerp_app_name') || 'SoleERP';
   });
   const [logoUrl, setLogoUrl] = useState<string>(() => {
-    const saved = localStorage.getItem('soleerp_logo_url');
-    return saved || '';
+    return localStorage.getItem('soleerp_logo_url') || '';
   });
 
   const [selectedShowroomId, setSelectedShowroomId] = useState<string>(() => {

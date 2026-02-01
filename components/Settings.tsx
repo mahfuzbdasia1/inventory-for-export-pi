@@ -314,12 +314,67 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
+        {/* Branch Management */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Store size={20} className="text-green-600" /> Showrooms / Branches</h3>
+            <button onClick={handleOpenAddBranch} className="bg-gray-800 text-white px-3 py-1.5 rounded flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all cursor-pointer">
+              <Plus size={16} /> Add Branch
+            </button>
+          </div>
+          <div className="wp-card rounded-md divide-y divide-gray-100 overflow-hidden">
+            {showrooms.map(s => (
+              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-gray-50 group transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-50 text-green-600 rounded flex items-center justify-center"><Store size={20} /></div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800">{s.name}</h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight flex items-center gap-1">
+                      <MapPin size={10} /> {s.location}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => handleOpenEditBranch(s)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"><Edit size={16} /></button>
+                  {showrooms.length > 1 && (
+                    <button onClick={(e) => handleBranchDelete(e, s.id)} className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={16} /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Category Management */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Tag size={20} className="text-orange-600" /> Product Categories</h3>
+            <button onClick={handleOpenAddCategory} className="bg-gray-800 text-white px-3 py-1.5 rounded flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all cursor-pointer">
+              <Plus size={16} /> New Category
+            </button>
+          </div>
+          <div className="wp-card rounded-md divide-y divide-gray-100 overflow-hidden">
+            {categories.map(c => (
+              <div key={c.id} className="p-4 flex items-center justify-between hover:bg-gray-50 group transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded flex items-center justify-center"><Tag size={20} /></div>
+                  <h4 className="font-bold text-sm text-gray-800">{c.name}</h4>
+                </div>
+                <div className="flex items-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => handleOpenEditCategory(c)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"><Edit size={16} /></button>
+                  <button onClick={() => setCategories(prev => prev.filter(cat => cat.id !== c.id))} className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={16} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Roles Management */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Briefcase size={20} className="text-gray-500" /> Staff Roles</h3>
+            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Briefcase size={20} className="text-purple-600" /> Staff Roles</h3>
             <button onClick={handleOpenAddRole} className="bg-gray-800 text-white px-3 py-1.5 rounded flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all cursor-pointer">
-              <Plus size={16} /> Define New Role
+              <Plus size={16} /> Define Role
             </button>
           </div>
           <div className="wp-card rounded-md divide-y divide-gray-100 overflow-hidden">
@@ -329,24 +384,12 @@ const Settings: React.FC<SettingsProps> = ({
                   <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded flex items-center justify-center"><Briefcase size={20} /></div>
                   <div>
                     <h4 className="font-bold text-sm text-gray-800">{r.name}</h4>
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Access Level: {r.accessLevel}</p>
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Access: {r.accessLevel}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                   <button 
-                    onClick={() => handleOpenEditRole(r)} 
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                    title="Edit Role"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteRole(r.id)} 
-                    className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
-                    title="Delete Role"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                   <button onClick={() => handleOpenEditRole(r)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"><Edit size={16} /></button>
+                   <button onClick={() => handleDeleteRole(r.id)} className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={16} /></button>
                 </div>
               </div>
             ))}
@@ -356,16 +399,20 @@ const Settings: React.FC<SettingsProps> = ({
         {/* Branding & Others */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Layout size={20} className="text-gray-500" /> Branding</h3>
+            <h3 className="font-black text-gray-700 flex items-center gap-2 uppercase text-sm tracking-widest"><Layout size={20} className="text-gray-500" /> Branding & Financials</h3>
           </div>
-          <div className="wp-card p-6 rounded-md space-y-4">
+          <div className="wp-card p-6 rounded-md space-y-6">
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-gray-400">ERP App Name</label>
-              <input type="text" className="w-full border p-2 rounded font-bold" value={appName} onChange={e => setAppName(e.target.value)} />
+              <input type="text" className="w-full border p-2.5 rounded font-bold" value={appName} onChange={e => setAppName(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-gray-400">Logo Image URL</label>
-              <input type="text" className="w-full border p-2 rounded text-sm" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} />
+              <input type="text" className="w-full border p-2.5 rounded text-sm" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-gray-400">VAT Rate (%)</label>
+              <input type="number" className="w-full border p-2.5 rounded font-black text-blue-600" value={vatRate} onChange={e => setVatRate(Number(e.target.value))} />
             </div>
           </div>
         </div>
@@ -383,32 +430,20 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
             <form onSubmit={handleRoleSubmit} className="p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">Role Title (e.g. Senior Cashier)</label>
-                <input 
-                  required 
-                  className="w-full border p-2.5 rounded font-bold" 
-                  value={roleFormData.name} 
-                  onChange={e => setRoleFormData({...roleFormData, name: e.target.value})} 
-                  placeholder="e.g. Floor Manager"
-                />
+                <label className="text-[10px] font-black uppercase text-gray-400">Role Title</label>
+                <input required className="w-full border p-2.5 rounded font-bold" value={roleFormData.name} onChange={e => setRoleFormData({...roleFormData, name: e.target.value})} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">System Access Permission</label>
-                <select 
-                  className="w-full border p-2.5 rounded font-bold" 
-                  value={roleFormData.accessLevel} 
-                  onChange={e => setRoleFormData({...roleFormData, accessLevel: e.target.value as UserRole})}
-                >
-                  <option value="SELLER">SELLER (POS & Limited Stock)</option>
-                  <option value="MANAGER">MANAGER (Full Stock & Reports)</option>
-                  <option value="ADMIN">ADMIN (Full Access)</option>
+                <label className="text-[10px] font-black uppercase text-gray-400">Access Permission</label>
+                <select className="w-full border p-2.5 rounded font-bold" value={roleFormData.accessLevel} onChange={e => setRoleFormData({...roleFormData, accessLevel: e.target.value as UserRole})}>
+                  <option value="SELLER">SELLER (POS Only)</option>
+                  <option value="MANAGER">MANAGER (Reports & Stock)</option>
+                  <option value="ADMIN">ADMIN (Full Control)</option>
                 </select>
               </div>
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 text-xs font-black uppercase text-gray-500">Cancel</button>
-                <button type="submit" className="flex-[2] py-2 bg-purple-600 text-white font-black uppercase rounded tracking-widest cursor-pointer shadow-lg shadow-purple-500/20">
-                  {editingRole ? 'Update Role' : 'Register Role'}
-                </button>
+                <button type="submit" className="flex-[2] py-2 bg-purple-600 text-white font-black uppercase rounded tracking-widest cursor-pointer shadow-lg">Save Role</button>
               </div>
             </form>
           </div>
@@ -440,7 +475,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400">Job Role</label>
                   <select className="w-full border p-2.5 rounded font-bold text-xs" value={userFormData.roleId} onChange={e => setUserFormData({...userFormData, roleId: e.target.value})}>
-                    {staffRoles.map(r => <option key={r.id} value={r.id}>{r.name} ({r.accessLevel})</option>)}
+                    {staffRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
                 {staffRoles.find(r => r.id === userFormData.roleId)?.accessLevel !== 'ADMIN' && (
@@ -454,7 +489,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowUserModal(false)} className="flex-1 py-3 text-xs font-black uppercase text-gray-500">Cancel</button>
-                <button type="submit" className="flex-[2] py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded cursor-pointer shadow-lg shadow-blue-500/20">Grant Access</button>
+                <button type="submit" className="flex-[2] py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded cursor-pointer">Grant Access</button>
               </div>
             </form>
           </div>
@@ -466,9 +501,7 @@ const Settings: React.FC<SettingsProps> = ({
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b bg-blue-50 flex justify-between">
-              <h2 className="font-black text-blue-900 uppercase tracking-tight flex items-center gap-2">
-                <Edit size={18} /> Update User Access
-              </h2>
+              <h2 className="font-black text-blue-900 uppercase tracking-tight">Update User Access</h2>
               <button onClick={() => setShowEditUserModal(false)} className="cursor-pointer text-blue-400 hover:text-blue-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
@@ -490,7 +523,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400">Job Role</label>
                   <select className="w-full border p-2.5 rounded font-bold text-xs" value={userFormData.roleId} onChange={e => setUserFormData({...userFormData, roleId: e.target.value})}>
-                    {staffRoles.map(r => <option key={r.id} value={r.id}>{r.name} ({r.accessLevel})</option>)}
+                    {staffRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
                 {staffRoles.find(r => r.id === userFormData.roleId)?.accessLevel !== 'ADMIN' && (
@@ -504,9 +537,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowEditUserModal(false)} className="flex-1 py-3 text-xs font-black uppercase text-gray-500">Cancel</button>
-                <button type="submit" className="flex-[2] py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded cursor-pointer shadow-lg shadow-blue-500/20">
-                  Update User
-                </button>
+                <button type="submit" className="flex-[2] py-3 bg-blue-600 text-white font-black uppercase tracking-widest rounded cursor-pointer">Update Profile</button>
               </div>
             </form>
           </div>
@@ -532,7 +563,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div className="pt-4 border-t flex justify-end gap-3">
                 <button type="button" onClick={() => setShowBranchModal(false)} className="px-4 py-2 text-xs font-black uppercase text-gray-500 cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black uppercase rounded shadow-lg shadow-blue-500/20 cursor-pointer tracking-widest text-xs">Save Branch</button>
+                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black uppercase rounded shadow-lg tracking-widest text-xs">Save Branch</button>
               </div>
             </form>
           </div>
@@ -554,7 +585,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div className="pt-4 border-t flex justify-end gap-3">
                 <button type="button" onClick={() => setShowCategoryModal(false)} className="px-4 py-2 text-xs font-black uppercase text-gray-500 cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-green-600 text-white font-black uppercase rounded shadow-lg shadow-green-500/20 cursor-pointer tracking-widest text-xs">Save Category</button>
+                <button type="submit" className="px-6 py-2 bg-green-600 text-white font-black uppercase rounded shadow-lg tracking-widest text-xs">Save Category</button>
               </div>
             </form>
           </div>

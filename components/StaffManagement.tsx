@@ -20,7 +20,7 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
   setUsers, 
   showrooms, 
   onAddSalaryExpense,
-  salaryPayments,
+  salaryPayments = [], 
   setSalaryPayments,
   currentUser,
   staffRoles
@@ -132,28 +132,31 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
 
   // Helper for resilient month comparison
   const isPaidForMonth = (userId: string, targetMonth: string) => {
+    if (!Array.isArray(salaryPayments)) return false;
     const normalizedTarget = targetMonth.replace(/\s+/g, ' ').trim().toLowerCase();
     return salaryPayments.some(p => 
-      p.userId === userId && 
-      p.month.replace(/\s+/g, ' ').trim().toLowerCase() === normalizedTarget
+      p && p.userId === userId && 
+      p.month && p.month.replace(/\s+/g, ' ').trim().toLowerCase() === normalizedTarget
     );
   };
 
   const handleProcessSalary = (user: User) => {
-    if (!user.id) return;
+    if (!user || !user.id) return;
 
+    // Explicitly treat baseSalary as a number and validate
     const salaryAmount = Number(user.baseSalary) || 0;
+    
     if (salaryAmount <= 0) {
-      alert(`Cannot process payment: ${user.fullName} has no defined base salary. Please update their profile.`);
+      alert(`Cannot process payment: ${user.fullName} has no defined base salary or it is zero. Please update their profile first.`);
       return;
     }
 
     if (isPaidForMonth(user.id, selectedMonth)) {
-      alert(`Payroll for ${user.fullName} has already been processed for ${selectedMonth}.`);
+      alert(`Payroll for ${user.fullName} has already been recorded for ${selectedMonth}.`);
       return;
     }
 
-    const confirmMsg = `PAYROLL DISBURSEMENT AUTHORIZATION\n\nEmployee: ${user.fullName}\nPeriod: ${selectedMonth}\nAmount: ৳${salaryAmount.toLocaleString()}\n\nProceed with payment?`;
+    const confirmMsg = `CONFIRM PAYROLL DISBURSEMENT\n\nEmployee: ${user.fullName}\nPeriod: ${selectedMonth}\nAmount: ৳${salaryAmount.toLocaleString()}\n\nAuthorize this transaction?`;
 
     if (window.confirm(confirmMsg)) {
       try {
@@ -168,32 +171,37 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
           datePaid: new Date().toISOString()
         };
 
-        // 1. Log the Business Expense
+        // 1. Log the Business Expense first (Critical for financial integrity)
         onAddSalaryExpense({
           showroomId: targetShowroomId,
           category: 'Salary',
-          description: `Payroll: ${user.fullName} (${selectedMonth})`,
+          description: `Payroll Disbursed: ${user.fullName} for ${selectedMonth}`,
           amount: salaryAmount,
           date: new Date().toISOString()
         });
 
-        // 2. Update Salary Records
-        setSalaryPayments(prev => [...prev, payment]);
+        // 2. Update the system payroll records state
+        setSalaryPayments(prev => {
+          const current = Array.isArray(prev) ? prev : [];
+          return [...current, payment];
+        });
 
-        // 3. Show Instant Receipt
+        // 3. Trigger receipt display for verification
         setSelectedReceipt({ payment, user });
         setShowReceipt(true);
       } catch (err) {
-        console.error("Payroll Error:", err);
-        alert("System encountered an error processing the payment.");
+        console.error("Critical Payroll Process Error:", err);
+        alert("The system failed to finalize the payment due to an internal error.");
       }
     }
   };
 
   const handleViewHistoricalReceipt = (user: User) => {
+    if (!Array.isArray(salaryPayments)) return;
+    const normalizedSelected = selectedMonth.replace(/\s+/g, ' ').trim().toLowerCase();
     const payment = salaryPayments.find(p => 
-      p.userId === user.id && 
-      p.month.replace(/\s+/g, ' ').trim().toLowerCase() === selectedMonth.replace(/\s+/g, ' ').trim().toLowerCase()
+      p && p.userId === user.id && 
+      p.month && p.month.replace(/\s+/g, ' ').trim().toLowerCase() === normalizedSelected
     );
     if (payment) {
       setSelectedReceipt({ payment, user });

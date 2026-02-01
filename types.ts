@@ -1,3 +1,4 @@
+
 export type UserRole = 'ADMIN' | 'MANAGER' | 'SELLER';
 
 export interface StaffRole {
@@ -24,11 +25,14 @@ export interface SalaryPayment {
   id: string;
   userId: string;
   showroomId: string;
-  amount: number;
+  basicSalary: number;
+  amount: number; // Net Paid Amount
   month: string; // e.g., "October 2023"
   datePaid: string;
-  bonus?: number;
+  bonus: number;
+  deduction: number;
   note?: string;
+  status: 'Paid' | 'Unpaid';
 }
 
 export interface Category {

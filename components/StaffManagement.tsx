@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { User, UserRole, Showroom, SalaryPayment, Expense, StaffRole } from '../types';
-import { Users, Plus, Edit, Trash2, Wallet, Calendar, Search, MapPin, X, CheckCircle, DollarSign, BadgeCheck, Briefcase, UserCheck, UserX, Printer, FileText, Download, ShieldCheck } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Wallet, Calendar, Search, MapPin, X, CheckCircle, DollarSign, BadgeCheck, Briefcase, UserCheck, UserX, Printer, FileText, Download, ShieldCheck, History, Calculator, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 declare var html2pdf: any;
 
@@ -25,15 +26,24 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
   currentUser,
   staffRoles
 }) => {
-  const [activeTab, setActiveTab] = useState<'directory' | 'payroll'>('directory');
+  const [activeTab, setActiveTab] = useState<'directory' | 'payroll' | 'sheet'>('directory');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<User | null>(null);
+  const [selectedUserForPay, setSelectedUserForPay] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Receipt State
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<{payment: SalaryPayment, user: User} | null>(null);
+
+  // Pay Modal State
+  const [payFormData, setPayFormData] = useState({
+    bonus: 0,
+    deduction: 0,
+    note: ''
+  });
 
   const [formData, setFormData] = useState<Partial<User>>({
     fullName: '',
@@ -140,59 +150,60 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
     );
   };
 
-  const handleProcessSalary = (user: User) => {
-    if (!user || !user.id) return;
-
-    // Explicitly treat baseSalary as a number and validate
-    const salaryAmount = Number(user.baseSalary) || 0;
-    
-    if (salaryAmount <= 0) {
-      alert(`Cannot process payment: ${user.fullName} has no defined base salary or it is zero. Please update their profile first.`);
-      return;
-    }
-
+  const handleOpenPayModal = (user: User) => {
     if (isPaidForMonth(user.id, selectedMonth)) {
-      alert(`Payroll for ${user.fullName} has already been recorded for ${selectedMonth}.`);
+      alert(`Salary already paid to ${user.fullName} for ${selectedMonth}.`);
       return;
     }
+    setSelectedUserForPay(user);
+    setPayFormData({ bonus: 0, deduction: 0, note: '' });
+    setShowPayModal(true);
+  };
 
-    const confirmMsg = `CONFIRM PAYROLL DISBURSEMENT\n\nEmployee: ${user.fullName}\nPeriod: ${selectedMonth}\nAmount: ৳${salaryAmount.toLocaleString()}\n\nAuthorize this transaction?`;
+  const handleProcessSalary = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForPay) return;
 
-    if (window.confirm(confirmMsg)) {
-      try {
-        const targetShowroomId = user.assignedShowroomId || (showrooms.length > 0 ? showrooms[0].id : 'wh');
+    const basicSalary = Number(selectedUserForPay.baseSalary) || 0;
+    const bonus = Number(payFormData.bonus) || 0;
+    const deduction = Number(payFormData.deduction) || 0;
+    const netSalary = basicSalary + bonus - deduction;
 
-        const payment: SalaryPayment = {
-          id: `SAL-${Date.now().toString().slice(-6)}`,
-          userId: user.id,
-          showroomId: targetShowroomId,
-          amount: salaryAmount,
-          month: selectedMonth,
-          datePaid: new Date().toISOString()
-        };
+    try {
+      const targetShowroomId = selectedUserForPay.assignedShowroomId || (showrooms.length > 0 ? showrooms[0].id : 'wh');
 
-        // 1. Log the Business Expense first (Critical for financial integrity)
-        onAddSalaryExpense({
-          showroomId: targetShowroomId,
-          category: 'Salary',
-          description: `Payroll Disbursed: ${user.fullName} for ${selectedMonth}`,
-          amount: salaryAmount,
-          date: new Date().toISOString()
-        });
+      const payment: SalaryPayment = {
+        id: `SAL-${Date.now().toString().slice(-6)}`,
+        userId: selectedUserForPay.id,
+        showroomId: targetShowroomId,
+        basicSalary: basicSalary,
+        bonus: bonus,
+        deduction: deduction,
+        amount: netSalary,
+        month: selectedMonth,
+        datePaid: new Date().toISOString(),
+        note: payFormData.note,
+        status: 'Paid'
+      };
 
-        // 2. Update the system payroll records state
-        setSalaryPayments(prev => {
-          const current = Array.isArray(prev) ? prev : [];
-          return [...current, payment];
-        });
+      // 1. Log Expense
+      onAddSalaryExpense({
+        showroomId: targetShowroomId,
+        category: 'Salary',
+        description: `Payroll: ${selectedUserForPay.fullName} (${selectedMonth}) - Net: ৳${netSalary.toLocaleString()}`,
+        amount: netSalary,
+        date: new Date().toISOString()
+      });
 
-        // 3. Trigger receipt display for verification
-        setSelectedReceipt({ payment, user });
-        setShowReceipt(true);
-      } catch (err) {
-        console.error("Critical Payroll Process Error:", err);
-        alert("The system failed to finalize the payment due to an internal error.");
-      }
+      // 2. Save Payment
+      setSalaryPayments(prev => [...prev, payment]);
+
+      // 3. UI Updates
+      setShowPayModal(false);
+      setSelectedReceipt({ payment, user: selectedUserForPay });
+      setShowReceipt(true);
+    } catch (err) {
+      alert("Error processing payment.");
     }
   };
 
@@ -209,14 +220,13 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
     }
   };
 
-  const handleSavePDF = () => {
-    if (!selectedReceipt) return;
-    const element = document.getElementById('salary-voucher-content');
+  const handleSavePDF = (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
     if (!element) return;
 
     const opt = {
       margin: 0.5,
-      filename: `Salary_Slip_${selectedReceipt.user.fullName.replace(/\s+/g, '_')}_${selectedReceipt.payment.month.replace(/\s+/g, '_')}.pdf`,
+      filename: `${filename}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 3, useCORS: true },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -232,44 +242,37 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
     }
   };
 
+  // Salary Sheet Memo
+  const salarySheetData = useMemo(() => {
+    return salaryPayments.map(p => {
+      const user = users.find(u => u.id === p.userId);
+      return { ...p, user };
+    }).sort((a, b) => new Date(b.datePaid).getTime() - new Date(a.datePaid).getTime());
+  }, [salaryPayments, users]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">HR & Payroll System</h1>
-          <p className="text-sm text-gray-500 font-medium">Manage human resources and monthly salary disbursements.</p>
+          <p className="text-sm text-gray-500 font-medium">Enterprise workforce management and automated payroll.</p>
         </div>
-        <div className="flex gap-2 bg-white p-1 rounded border border-gray-200 shadow-sm w-fit">
-           <button 
-            type="button"
-            onClick={() => setActiveTab('directory')} 
-            className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${activeTab === 'directory' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-          >
-            Staff Directory
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab('payroll')} 
-            className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${activeTab === 'payroll' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-          >
-            Payroll Processing
-          </button>
+        <div className="flex gap-1 bg-white p-1 rounded border border-gray-200 shadow-sm w-fit">
+           <button onClick={() => setActiveTab('directory')} className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'directory' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Directory</button>
+           <button onClick={() => setActiveTab('payroll')} className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'payroll' ? 'bg-green-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Process Payroll</button>
+           <button onClick={() => setActiveTab('sheet')} className={`px-4 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'sheet' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Salary Sheet</button>
         </div>
       </div>
 
-      {activeTab === 'directory' ? (
+      {activeTab === 'directory' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input type="text" placeholder="Search staff members..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="Search staff members..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
-            <button 
-              type="button"
-              onClick={handleOpenAdd} 
-              className="bg-gray-900 text-white px-4 py-2 rounded flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all cursor-pointer active:scale-95 shadow-md w-full sm:w-auto"
-            >
-              <Plus size={16} /> Register New Employee
+            <button onClick={handleOpenAdd} className="bg-gray-900 text-white px-4 py-2 rounded flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-md w-full sm:w-auto">
+              <Plus size={16} /> Register Staff
             </button>
           </div>
 
@@ -278,43 +281,31 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
               <table className="w-full text-left min-w-[700px]">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-[10px] uppercase font-black tracking-widest border-b">
-                    <th className="px-6 py-4">Employee Info</th>
-                    <th className="px-6 py-4">Designation</th>
-                    <th className="px-6 py-4">Branch</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 font-black">Monthly Salary</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4">Employee</th>
+                    <th className="px-6 py-4">Job Role</th>
+                    <th className="px-6 py-4 text-center">Branch</th>
+                    <th className="px-6 py-4">Salary</th>
+                    <th className="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredUsers.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-50 group transition-colors">
+                    <tr key={u.id} className="hover:bg-gray-50 group">
                       <td className="px-6 py-4 flex items-center gap-3">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} className="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 shrink-0" alt="" />
-                        <div className="min-w-0">
-                          <p className="font-bold text-gray-900 truncate">{u.fullName}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter truncate">@{u.username} • {u.phoneNumber || 'No Phone'}</p>
-                        </div>
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} className="w-9 h-9 rounded-full border" alt="" />
+                        <div><p className="font-bold text-gray-900">{u.fullName}</p><p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">@{u.username}</p></div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-gray-900 uppercase tracking-tight">{staffRoles.find(r => r.id === u.roleId)?.name || (u.role === 'ADMIN' ? 'System Admin' : 'Staff')}</span>
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{u.role} Access</span>
-                        </div>
+                        <span className="text-xs font-bold text-gray-900 uppercase">{staffRoles.find(r => r.id === u.roleId)?.name || 'Staff'}</span>
                       </td>
-                      <td className="px-6 py-4 text-xs font-bold text-gray-600 uppercase tracking-tight">
-                          {showrooms.find(s => s.id === u.assignedShowroomId)?.name || 'Admin HQ'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${u.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                          {u.status}
-                        </span>
+                      <td className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase">
+                          {showrooms.find(s => s.id === u.assignedShowroomId)?.name || 'HQ'}
                       </td>
                       <td className="px-6 py-4 font-black text-gray-900">৳{u.baseSalary.toLocaleString()}</td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                          <button type="button" onClick={() => handleOpenEdit(u)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"><Edit size={14} /></button>
-                          <button type="button" onClick={() => deleteStaff(u.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={14} /></button>
+                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                          <button onClick={() => handleOpenEdit(u)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit size={14} /></button>
+                          <button onClick={() => deleteStaff(u.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
@@ -324,23 +315,21 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'payroll' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-          <div className="bg-green-50 border border-green-100 p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="bg-green-50 border border-green-100 p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center shrink-0">
                 <Calendar size={24} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-green-900 uppercase tracking-tight">Payroll Disbursement Period</h3>
+                <h3 className="text-sm font-black text-green-900 uppercase tracking-tight">Select Payment Period</h3>
                 <p className="text-xs text-green-700 font-bold">{selectedMonth}</p>
               </div>
             </div>
-            <select 
-              className="bg-white border border-green-200 text-xs font-bold p-2.5 rounded shadow-sm cursor-pointer hover:border-green-400 transition-colors focus:ring-2 focus:ring-green-500/20 w-full sm:w-auto" 
-              value={selectedMonth} 
-              onChange={e => setSelectedMonth(e.target.value)}
-            >
+            <select className="bg-white border border-green-200 text-xs font-bold p-2.5 rounded shadow-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
               {Array.from({length: 12}).map((_, i) => {
                 const d = new Date(); d.setMonth(d.getMonth() - i);
                 const val = d.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -352,44 +341,27 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
             {users.filter(u => u.status === 'ACTIVE').map(user => {
               const isPaid = isPaidForMonth(user.id, selectedMonth);
               return (
-                <div key={user.id} className={`wp-card p-6 rounded-lg border-l-4 transition-all duration-200 ${isPaid ? 'border-green-500 bg-green-50/10' : 'border-gray-200 hover:border-blue-500 hover:shadow-lg'}`}>
+                <div key={user.id} className={`wp-card p-6 rounded-lg border-l-4 ${isPaid ? 'border-green-500 bg-green-50/10' : 'border-gray-200'}`}>
                   <div className="flex justify-between items-start mb-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100 shrink-0">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-10 h-10" alt="" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-gray-900 text-sm truncate">{user.fullName}</h4>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest truncate">{staffRoles.find(r => r.id === user.roleId)?.name || (user.role === 'ADMIN' ? 'System Admin' : 'Staff')}</p>
+                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-10 h-10 rounded-full border" alt="" />
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-sm">{user.fullName}</h4>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{staffRoles.find(r => r.id === user.roleId)?.name || 'Staff'}</p>
                       </div>
                     </div>
                     {isPaid && <span className="flex items-center gap-1.5 text-[10px] font-black text-green-600 uppercase tracking-tighter bg-green-100 px-2 py-1 rounded shrink-0"><BadgeCheck size={14} /> Paid</span>}
                   </div>
-                  <div className="space-y-3 mb-6 bg-gray-50/50 p-3 rounded border border-gray-100">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-400 font-bold uppercase text-[10px] tracking-tight">Base Salary</span>
-                      <span className="font-black text-gray-900">৳{user.baseSalary.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-400 font-bold uppercase text-[10px] tracking-tight">Branch</span>
-                      <span className="font-bold text-gray-600 truncate ml-2 text-right">{showrooms.find(s => s.id === user.assignedShowroomId)?.name || 'Admin HQ'}</span>
-                    </div>
+                  <div className="space-y-3 mb-6 bg-gray-50 p-3 rounded border border-gray-100">
+                    <div className="flex justify-between items-center text-xs"><span className="text-gray-400 font-bold uppercase text-[9px]">Basic Pay</span><span className="font-black text-gray-900">৳{user.baseSalary.toLocaleString()}</span></div>
                   </div>
                   {!isPaid ? (
-                    <button 
-                      type="button"
-                      onClick={() => handleProcessSalary(user)} 
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded shadow-lg shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <DollarSign size={14} /> Process Payment
+                    <button onClick={() => handleOpenPayModal(user)} className="w-full py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all">
+                      <DollarSign size={14} /> Pay Salary
                     </button>
                   ) : (
-                    <button 
-                      type="button"
-                      onClick={() => handleViewHistoricalReceipt(user)}
-                      className="w-full py-2.5 bg-gray-100 text-gray-700 hover:bg-gray-200 text-[10px] font-black uppercase tracking-widest rounded border border-gray-200 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
-                    >
-                      <FileText size={14} /> View Receipt
+                    <button onClick={() => handleViewHistoricalReceipt(user)} className="w-full py-2.5 bg-gray-100 text-gray-700 text-[10px] font-black uppercase tracking-widest rounded border flex items-center justify-center gap-2 active:scale-95 transition-all">
+                      <FileText size={14} /> View Slip
                     </button>
                   )}
                 </div>
@@ -399,21 +371,127 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
         </div>
       )}
 
+      {activeTab === 'sheet' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <h3 className="font-black text-gray-900 uppercase text-sm tracking-tight flex items-center gap-2"><History size={20} className="text-purple-600" /> Salary Disbursement Sheet</h3>
+            <button onClick={() => handleSavePDF('salary-sheet-table', `Salary_Sheet_${Date.now()}`)} className="bg-gray-800 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+              <Download size={14} /> Export Sheet
+            </button>
+          </div>
+          <div className="wp-card rounded-md overflow-hidden shadow-sm" id="salary-sheet-table">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-[10px] font-black uppercase tracking-widest border-b">
+                    <th className="px-6 py-4">Employee Details</th>
+                    <th className="px-6 py-4">Month</th>
+                    <th className="px-6 py-4">Basic Salary</th>
+                    <th className="px-6 py-4">Bonus</th>
+                    <th className="px-6 py-4">Deduction</th>
+                    <th className="px-6 py-4">Net Amount</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Date Paid</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {salarySheetData.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">{p.user?.fullName || 'Ex-Employee'}</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">ID: {p.userId}</p>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-gray-600 uppercase">{p.month}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-gray-800">৳{p.basicSalary?.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-green-600">+৳{p.bonus?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-red-600">-৳{p.deduction?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4 text-sm font-black text-blue-600">৳{p.amount.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-black rounded uppercase">Paid</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500">{new Date(p.datePaid).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {salarySheetData.length === 0 && (
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400 italic">No salary records found in the database.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Salary Modal */}
+      {showPayModal && selectedUserForPay && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b bg-blue-50 flex justify-between items-center">
+              <h2 className="font-black text-blue-900 uppercase tracking-tight flex items-center gap-2"><Calculator size={20} /> Salary Disbursement</h2>
+              <button onClick={() => setShowPayModal(false)} className="text-blue-400 hover:text-blue-600"><X size={24} /></button>
+            </div>
+            <form onSubmit={handleProcessSalary} className="p-6 space-y-6">
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUserForPay.username}`} className="w-10 h-10 rounded-full border" alt="" />
+                <div><p className="font-bold text-gray-900">{selectedUserForPay.fullName}</p><p className="text-[10px] text-gray-400 font-black uppercase">Period: {selectedMonth}</p></div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Basic Salary</label>
+                    <div className="w-full bg-gray-50 border p-2.5 rounded text-sm font-black text-gray-600">৳{selectedUserForPay.baseSalary.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">Status</label>
+                    <div className="w-full bg-blue-50 border border-blue-100 p-2.5 rounded text-[10px] font-black text-blue-600 uppercase text-center">Ready To Pay</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1"><ArrowUpRight size={10} className="text-green-500" /> Bonus</label>
+                    <input type="number" className="w-full border p-2.5 rounded focus:ring-1 focus:ring-blue-500 font-bold" value={payFormData.bonus} onChange={e => setPayFormData({...payFormData, bonus: Number(e.target.value)})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-1"><ArrowDownRight size={10} className="text-red-500" /> Deduction</label>
+                    <input type="number" className="w-full border p-2.5 rounded focus:ring-1 focus:ring-blue-500 font-bold" value={payFormData.deduction} onChange={e => setPayFormData({...payFormData, deduction: Number(e.target.value)})} />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block">Note</label>
+                  <input type="text" placeholder="e.g. Eid Bonus, Late deduction..." className="w-full border p-2.5 rounded text-sm" value={payFormData.note} onChange={e => setPayFormData({...payFormData, note: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t-2 border-dashed border-gray-100 flex justify-between items-center">
+                <span className="font-black text-gray-900 uppercase text-xs">Total Net Paid</span>
+                <span className="text-2xl font-black text-blue-600">৳{(selectedUserForPay.baseSalary + payFormData.bonus - payFormData.deduction).toLocaleString()}</span>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowPayModal(false)} className="flex-1 py-3 text-xs font-black uppercase text-gray-500 hover:bg-gray-100 transition-all rounded">Cancel</button>
+                <button type="submit" className="flex-[2] py-3 bg-blue-600 text-white font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all rounded">Authorize Payment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Salary Receipt Modal */}
       {showReceipt && selectedReceipt && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300 print:p-0 print:bg-white print:static">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col print:shadow-none print:w-full print:m-0" id="salary-voucher">
             <div className="p-4 border-b bg-gray-50 flex justify-between items-center print:hidden">
-              <div className="flex items-center gap-2 text-green-600 font-bold">
-                <CheckCircle size={20} /> Disbursement Voucher
-              </div>
+              <div className="flex items-center gap-2 text-green-600 font-bold"><CheckCircle size={20} /> Disbursement Successful</div>
               <button onClick={() => setShowReceipt(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={24} /></button>
             </div>
             
             <div className="flex-1 overflow-y-auto print:overflow-visible" id="salary-voucher-content">
               <div className="p-8 space-y-8 print:p-8">
                 <div className="text-center space-y-2">
-                  <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">SALARY DISBURSEMENT RECEIPT</h1>
+                  <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">SALARY DISBURSEMENT VOUCHER</h1>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Official Business Document</p>
                 </div>
 
@@ -423,7 +501,6 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
                     <div>
                       <p className="text-gray-900 font-black">{selectedReceipt.user.fullName}</p>
                       <p className="text-gray-500 font-bold uppercase text-[10px]">{staffRoles.find(r => r.id === selectedReceipt.user.roleId)?.name || 'Staff'}</p>
-                      <p className="text-gray-400 mt-1">ID: {selectedReceipt.user.id}</p>
                     </div>
                   </div>
                   <div className="space-y-3 text-right">
@@ -431,7 +508,6 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
                     <div>
                       <p className="text-gray-900 font-black">Ref: {selectedReceipt.payment.id}</p>
                       <p className="text-gray-500 font-bold uppercase text-[10px]">Issued: {new Date(selectedReceipt.payment.datePaid).toLocaleDateString()}</p>
-                      <p className="text-gray-400 mt-1">{showrooms.find(s => s.id === selectedReceipt.payment.showroomId)?.name || 'Main HQ'}</p>
                     </div>
                   </div>
                 </div>
@@ -439,14 +515,9 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
                 <div className="space-y-4">
                   <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest border-b pb-2">Payment Breakdown</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500 font-bold uppercase text-[11px]">Salary Period</span>
-                      <span className="font-black text-gray-900">{selectedReceipt.payment.month}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500 font-bold uppercase text-[11px]">Basic Pay Amount</span>
-                      <span className="font-black text-gray-900">৳{selectedReceipt.payment.amount.toLocaleString()}</span>
-                    </div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500 font-bold uppercase text-[11px]">Basic Pay</span><span className="font-black text-gray-900">৳{selectedReceipt.payment.basicSalary?.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500 font-bold uppercase text-[11px]">Bonus</span><span className="font-black text-green-600">+৳{selectedReceipt.payment.bonus?.toLocaleString() || 0}</span></div>
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-500 font-bold uppercase text-[11px]">Deductions</span><span className="font-black text-red-600">-৳{selectedReceipt.payment.deduction?.toLocaleString() || 0}</span></div>
                   </div>
                   <div className="pt-4 border-t-2 border-gray-900 flex justify-between items-center">
                     <span className="text-gray-900 font-black uppercase text-base">Net Paid</span>
@@ -454,46 +525,23 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-16 pb-6 flex justify-between gap-12 print:pt-24">
-                  <div className="flex-1 text-center space-y-2">
-                    <div className="border-t border-gray-300 pt-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase">Employee Signature</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 text-center space-y-2">
-                    <div className="border-t border-gray-300 pt-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase">Authorized By</p>
-                    </div>
-                  </div>
+                <div className="pt-16 flex justify-between gap-12 print:pt-24">
+                  <div className="flex-1 text-center space-y-2 border-t border-gray-300 pt-2"><p className="text-[10px] font-black text-gray-400 uppercase">Employee Sign</p></div>
+                  <div className="flex-1 text-center space-y-2 border-t border-gray-300 pt-2"><p className="text-[10px] font-black text-gray-400 uppercase">Authorized By</p></div>
                 </div>
               </div>
             </div>
 
             <div className="p-4 bg-gray-50 border-t flex flex-col sm:flex-row gap-2 print:hidden shrink-0">
-              <button 
-                onClick={() => window.print()} 
-                className="flex-1 py-3 bg-gray-900 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95 shadow-lg cursor-pointer"
-              >
-                <Printer size={16} /> Print
-              </button>
-              <button 
-                onClick={handleSavePDF} 
-                className="flex-1 py-3 bg-blue-600 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-lg cursor-pointer"
-              >
-                <Download size={16} /> Save PDF
-              </button>
-              <button 
-                onClick={() => setShowReceipt(false)} 
-                className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
-              >
-                Close
-              </button>
+              <button onClick={() => window.print()} className="flex-1 py-3 bg-gray-900 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg"><Printer size={16} /> Print</button>
+              <button onClick={() => handleSavePDF('salary-voucher-content', `Salary_Voucher_${selectedReceipt.payment.id}`)} className="flex-1 py-3 bg-blue-600 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg"><Download size={16} /> Save PDF</button>
+              <button onClick={() => setShowReceipt(false)} className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded font-black uppercase text-[10px] tracking-widest shadow-sm">Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Register Staff Modal */}
+      {/* Register/Edit Staff Modals remain unchanged in basic structure but were enriched previously */}
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
@@ -520,63 +568,22 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
         </div>
       )}
 
-      {/* Edit Staff Modal */}
       {showEditModal && editingStaff && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
             <div className="p-4 border-b bg-blue-50 flex justify-between items-center shrink-0">
-              <h2 className="font-black text-blue-900 uppercase tracking-tight flex items-center gap-2 text-sm sm:text-base">
-                <Edit size={18} /> Edit Employee Profile
-              </h2>
+              <h2 className="font-black text-blue-900 uppercase tracking-tight flex items-center gap-2 text-sm sm:text-base"><Edit size={18} /> Edit Profile</h2>
               <button type="button" onClick={() => setShowEditModal(false)} className="text-blue-400 hover:text-blue-600 cursor-pointer"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto flex-1">
               <form onSubmit={handleUpdateStaff} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Full Name</label>
-                  <input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 font-bold text-sm" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">System Username</label>
-                  <div className="flex items-center gap-2 bg-gray-50 border p-2 rounded text-gray-400 text-sm font-mono cursor-not-allowed">
-                    <ShieldCheck size={14} />
-                    {formData.username}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Phone Number</label>
-                  <input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 text-sm" value={formData.phoneNumber} onChange={e => setFormData({...formData, phoneNumber: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Employment Status</label>
-                  <select className="w-full border p-2 rounded font-bold text-sm" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE'})}>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="INACTIVE">INACTIVE</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Job Role / Designation</label>
-                  <select className="w-full border p-2 rounded text-sm" value={formData.roleId} onChange={e => setFormData({...formData, roleId: e.target.value})}>
-                    {staffRoles.map(r => <option key={r.id} value={r.id}>{r.name} ({r.accessLevel})</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Assigned Branch</label>
-                  <select className="w-full border p-2 rounded text-sm" value={formData.assignedShowroomId} onChange={e => setFormData({...formData, assignedShowroomId: e.target.value})}>
-                    {showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Monthly Salary (৳)</label>
-                  <input type="number" required className="w-full border p-2 rounded font-black text-blue-600 text-sm" value={formData.baseSalary} onChange={e => setFormData({...formData, baseSalary: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Joining Date</label>
-                  <input type="date" required className="w-full border p-2 rounded text-sm" value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})} />
-                </div>
+                <div className="sm:col-span-2 space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Full Name</label><input required className="w-full border p-2 rounded font-bold text-sm" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} /></div>
+                <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Status</label><select className="w-full border p-2 rounded font-bold text-sm" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE'})}><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select></div>
+                <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Role</label><select className="w-full border p-2 rounded text-sm" value={formData.roleId} onChange={e => setFormData({...formData, roleId: e.target.value})}>{staffRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+                <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Salary (৳)</label><input type="number" required className="w-full border p-2 rounded font-black text-blue-600 text-sm" value={formData.baseSalary} onChange={e => setFormData({...formData, baseSalary: Number(e.target.value)})} /></div>
                 <div className="sm:col-span-2 pt-4 border-t flex flex-col sm:flex-row justify-end gap-3 mt-4">
-                  <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase cursor-pointer order-2 sm:order-1">Cancel</button>
-                  <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black rounded uppercase text-[10px] tracking-widest shadow-lg shadow-blue-500/20 transition-all active:scale-95 cursor-pointer order-1 sm:order-2">Update Profile</button>
+                  <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-[10px] font-black text-gray-500 uppercase cursor-pointer">Cancel</button>
+                  <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black rounded uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Update Profile</button>
                 </div>
               </form>
             </div>
@@ -586,17 +593,8 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
 
       <style>{`
         @media print {
-          #salary-voucher {
-            display: block !important;
-            width: 100% !important;
-            max-width: none !important;
-            margin: 0 !important;
-            border: none !important;
-            box-shadow: none !important;
-          }
-          body > *:not(#salary-voucher) {
-            display: none !important;
-          }
+          #salary-voucher { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; border: none !important; box-shadow: none !important; }
+          body > *:not(#salary-voucher) { display: none !important; }
         }
       `}</style>
     </div>

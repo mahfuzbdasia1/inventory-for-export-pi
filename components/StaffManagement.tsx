@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { User, UserRole, Showroom, SalaryPayment, Expense, StaffRole } from '../types';
 import { Users, Plus, Edit, Trash2, Wallet, Calendar, Search, MapPin, X, CheckCircle, DollarSign, BadgeCheck, Briefcase, UserCheck, UserX, Printer, FileText, Download, ShieldCheck } from 'lucide-react';
 
+declare var html2pdf: any;
+
 interface StaffManagementProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -199,6 +201,22 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
     }
   };
 
+  const handleSavePDF = () => {
+    if (!selectedReceipt) return;
+    const element = document.getElementById('salary-voucher-content');
+    if (!element) return;
+
+    const opt = {
+      margin: 0.5,
+      filename: `Salary_Slip_${selectedReceipt.user.fullName.replace(/\s+/g, '_')}_${selectedReceipt.payment.month.replace(/\s+/g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 3, useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+  };
+
   const deleteStaff = (id: string) => {
     if (id === currentUser.id) return alert("Protection: You cannot delete your own account.");
     if (window.confirm("Permanently remove this employee's access?")) {
@@ -384,69 +402,77 @@ const StaffManagement: React.FC<StaffManagementProps> = ({
               <button onClick={() => setShowReceipt(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={24} /></button>
             </div>
             
-            <div className="p-8 space-y-8 overflow-y-auto max-h-[85vh] print:p-12 print:max-h-none">
-              <div className="text-center space-y-2">
-                <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">SALARY DISBURSEMENT RECEIPT</h1>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Official Business Document</p>
-              </div>
+            <div className="flex-1 overflow-y-auto print:overflow-visible" id="salary-voucher-content">
+              <div className="p-8 space-y-8 print:p-8">
+                <div className="text-center space-y-2">
+                  <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">SALARY DISBURSEMENT RECEIPT</h1>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Official Business Document</p>
+                </div>
 
-              <div className="grid grid-cols-2 gap-8 border-y border-dashed border-gray-200 py-6 text-xs print:text-sm">
-                <div className="space-y-3">
-                  <p className="font-black text-gray-400 uppercase text-[9px]">Employee Details</p>
-                  <div>
-                    <p className="text-gray-900 font-black">{selectedReceipt.user.fullName}</p>
-                    <p className="text-gray-500 font-bold uppercase text-[10px]">{staffRoles.find(r => r.id === selectedReceipt.user.roleId)?.name || 'Staff'}</p>
-                    <p className="text-gray-400 mt-1">ID: {selectedReceipt.user.id}</p>
+                <div className="grid grid-cols-2 gap-8 border-y border-dashed border-gray-200 py-6 text-xs print:text-sm">
+                  <div className="space-y-3">
+                    <p className="font-black text-gray-400 uppercase text-[9px]">Employee Details</p>
+                    <div>
+                      <p className="text-gray-900 font-black">{selectedReceipt.user.fullName}</p>
+                      <p className="text-gray-500 font-bold uppercase text-[10px]">{staffRoles.find(r => r.id === selectedReceipt.user.roleId)?.name || 'Staff'}</p>
+                      <p className="text-gray-400 mt-1">ID: {selectedReceipt.user.id}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-right">
+                    <p className="font-black text-gray-400 uppercase text-[9px]">Voucher Info</p>
+                    <div>
+                      <p className="text-gray-900 font-black">Ref: {selectedReceipt.payment.id}</p>
+                      <p className="text-gray-500 font-bold uppercase text-[10px]">Issued: {new Date(selectedReceipt.payment.datePaid).toLocaleDateString()}</p>
+                      <p className="text-gray-400 mt-1">{showrooms.find(s => s.id === selectedReceipt.payment.showroomId)?.name || 'Main HQ'}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-3 text-right">
-                  <p className="font-black text-gray-400 uppercase text-[9px]">Voucher Info</p>
-                  <div>
-                    <p className="text-gray-900 font-black">Ref: {selectedReceipt.payment.id}</p>
-                    <p className="text-gray-500 font-bold uppercase text-[10px]">Issued: {new Date(selectedReceipt.payment.datePaid).toLocaleDateString()}</p>
-                    <p className="text-gray-400 mt-1">{showrooms.find(s => s.id === selectedReceipt.payment.showroomId)?.name || 'Main HQ'}</p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="space-y-4">
-                <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest border-b pb-2">Payment Breakdown</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 font-bold uppercase text-[11px]">Salary Period</span>
-                    <span className="font-black text-gray-900">{selectedReceipt.payment.month}</span>
+                <div className="space-y-4">
+                  <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest border-b pb-2">Payment Breakdown</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500 font-bold uppercase text-[11px]">Salary Period</span>
+                      <span className="font-black text-gray-900">{selectedReceipt.payment.month}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500 font-bold uppercase text-[11px]">Basic Pay Amount</span>
+                      <span className="font-black text-gray-900">৳{selectedReceipt.payment.amount.toLocaleString()}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 font-bold uppercase text-[11px]">Basic Pay Amount</span>
-                    <span className="font-black text-gray-900">৳{selectedReceipt.payment.amount.toLocaleString()}</span>
+                  <div className="pt-4 border-t-2 border-gray-900 flex justify-between items-center">
+                    <span className="text-gray-900 font-black uppercase text-base">Net Paid</span>
+                    <span className="text-2xl font-black text-blue-600">৳{selectedReceipt.payment.amount.toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="pt-4 border-t-2 border-gray-900 flex justify-between items-center">
-                  <span className="text-gray-900 font-black uppercase text-base">Net Paid</span>
-                  <span className="text-2xl font-black text-blue-600">৳{selectedReceipt.payment.amount.toLocaleString()}</span>
-                </div>
-              </div>
 
-              <div className="pt-16 pb-6 flex justify-between gap-12 print:pt-24">
-                <div className="flex-1 text-center space-y-2">
-                  <div className="border-t border-gray-300 pt-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Employee Signature</p>
+                <div className="pt-16 pb-6 flex justify-between gap-12 print:pt-24">
+                  <div className="flex-1 text-center space-y-2">
+                    <div className="border-t border-gray-300 pt-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Employee Signature</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 text-center space-y-2">
-                  <div className="border-t border-gray-300 pt-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Authorized By</p>
+                  <div className="flex-1 text-center space-y-2">
+                    <div className="border-t border-gray-300 pt-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Authorized By</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 border-t flex gap-3 print:hidden">
+            <div className="p-4 bg-gray-50 border-t flex flex-col sm:flex-row gap-2 print:hidden shrink-0">
               <button 
                 onClick={() => window.print()} 
                 className="flex-1 py-3 bg-gray-900 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95 shadow-lg cursor-pointer"
               >
-                <Printer size={16} /> Print Voucher
+                <Printer size={16} /> Print
+              </button>
+              <button 
+                onClick={handleSavePDF} 
+                className="flex-1 py-3 bg-blue-600 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-lg cursor-pointer"
+              >
+                <Download size={16} /> Save PDF
               </button>
               <button 
                 onClick={() => setShowReceipt(false)} 

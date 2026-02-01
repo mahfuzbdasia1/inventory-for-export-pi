@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Product, StockItem, Showroom, Sale, SaleItem } from '../types';
-import { Search, ShoppingCart, Trash2, CreditCard, Tag, Percent, Image as ImageIcon, User, Phone, X, Printer, CheckCircle, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, CreditCard, Tag, Percent, Image as ImageIcon, User, Phone, X, Printer, CheckCircle, MapPin, ChevronDown, ChevronUp, FileText, Download } from 'lucide-react';
+
+declare var html2pdf: any;
 
 interface POSProps {
   products: Product[];
@@ -84,6 +86,26 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
     setCustomerAddress('');
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleSavePDF = () => {
+    if (!lastSale) return;
+    const element = document.getElementById('pos-invoice-content');
+    if (!element) return;
+
+    const opt = {
+      margin: 0.5,
+      filename: `Invoice_${lastSale.id}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 3, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full relative overflow-hidden pb-20 sm:pb-0">
       {/* Product Selection */}
@@ -160,6 +182,7 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
             <div className="p-3 space-y-2">
               <input type="text" placeholder="Name" className="w-full px-2 py-1.5 border rounded text-xs" value={customerName} onChange={e => setCustomerName(e.target.value)} />
               <input type="text" placeholder="Phone" className="w-full px-2 py-1.5 border rounded text-xs" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+              <input type="text" placeholder="Address" className="w-full px-2 py-1.5 border rounded text-xs" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
             </div>
           </div>
 
@@ -221,39 +244,142 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
         </div>
       </div>
 
-      {/* Invoice Modal - Responsive */}
+      {/* Invoice Modal */}
       {showInvoice && lastSale && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] animate-in slide-in-from-bottom-5">
-            <div className="p-4 bg-gray-50 border-b flex justify-between items-center print:hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-300 print:p-0 print:bg-white print:static">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] print:shadow-none print:w-full print:m-0" id="pos-invoice">
+            <div className="p-4 bg-gray-50 border-b flex justify-between items-center print:hidden shrink-0">
               <div className="flex items-center gap-2 text-green-600 font-bold text-sm">
                 <CheckCircle size={18} /> Sale Success
               </div>
-              <button onClick={() => setShowInvoice(false)} className="p-1 hover:bg-gray-200 rounded-full"><X size={20} /></button>
+              <button onClick={() => setShowInvoice(false)} className="p-1 hover:bg-gray-200 rounded-full cursor-pointer"><X size={20} /></button>
             </div>
-            <div className="p-4 sm:p-8 space-y-6 overflow-y-auto">
-              <div className="text-center">
-                <h1 className="text-xl font-black uppercase">{appName}</h1>
-                <p className="text-[10px] font-bold text-gray-500">{currentShowroom.name}</p>
-              </div>
-              {/* Detailed Invoice Content Simplified for UI */}
-              <div className="border-t pt-4 space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Invoice:</span>
-                  <span className="font-bold">{lastSale.id}</span>
+            
+            <div className="flex-1 overflow-y-auto print:overflow-visible" id="pos-invoice-content">
+              <div className="p-6 sm:p-10 space-y-8 print:p-8">
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 bg-black rounded mx-auto flex items-center justify-center text-white font-black text-2xl mb-4">
+                    {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="logo" /> : appName.charAt(0)}
+                  </div>
+                  <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{appName}</h1>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{currentShowroom.name}</p>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase">{currentShowroom.location}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Total Paid:</span>
-                  <span className="font-black text-blue-600">৳{lastSale.finalAmount.toFixed(0)}</span>
+
+                <div className="border-y border-dashed border-gray-200 py-4 grid grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <p className="font-black text-gray-400 uppercase text-[9px]">Customer</p>
+                    <p className="font-black text-gray-900 truncate">{lastSale.customerName || 'Walk-in Customer'}</p>
+                    {lastSale.customerPhone && <p className="text-gray-500">{lastSale.customerPhone}</p>}
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <p className="font-black text-gray-400 uppercase text-[9px]">Invoice Details</p>
+                    <p className="font-black text-gray-900">#{lastSale.id}</p>
+                    <p className="text-gray-500">{new Date(lastSale.date).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100 font-black text-gray-400 uppercase text-[9px]">
+                        <th className="pb-2">Item Description</th>
+                        <th className="pb-2 text-center">Qty</th>
+                        <th className="pb-2 text-right">Price</th>
+                        <th className="pb-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {lastSale.items.map((item, idx) => {
+                        const prod = products.find(p => p.id === item.productId);
+                        return (
+                          <tr key={idx} className="text-gray-900 font-medium">
+                            <td className="py-3">
+                              <p className="font-bold">{prod?.name || 'Unknown Item'}</p>
+                              <p className="text-[9px] text-gray-400 uppercase">{prod?.brand}</p>
+                            </td>
+                            <td className="py-3 text-center">{item.quantity}</td>
+                            <td className="py-3 text-right">৳{item.unitPrice.toLocaleString()}</td>
+                            <td className="py-3 text-right font-bold">৳{(item.unitPrice * item.quantity).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-2 border-t pt-4">
+                  <div className="flex justify-between text-xs text-gray-500 font-bold uppercase">
+                    <span>Subtotal</span>
+                    <span>৳{lastSale.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 font-bold uppercase">
+                    <span>VAT ({vatRate}%)</span>
+                    <span>৳{lastSale.vat.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 font-bold uppercase">
+                    <span>Discount</span>
+                    <span className="text-red-600">-৳{lastSale.discount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-black text-gray-900 border-t-2 border-gray-900 pt-2">
+                    <span>Net Payable</span>
+                    <span className="text-blue-600">৳{lastSale.finalAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="text-center pt-8 pb-4">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Thank you for shopping with us!</p>
                 </div>
               </div>
-              <button onClick={() => window.print()} className="w-full py-3 bg-gray-900 text-white rounded font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                <Printer size={16} /> Print Receipt
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t flex flex-col xs:flex-row gap-2 print:hidden shrink-0">
+              <button 
+                onClick={handlePrint} 
+                className="flex-1 py-3 bg-gray-900 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95 shadow-lg cursor-pointer"
+              >
+                <Printer size={16} /> Print
+              </button>
+              <button 
+                onClick={handleSavePDF} 
+                className="flex-1 py-3 bg-blue-600 text-white rounded font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95 shadow-lg cursor-pointer"
+              >
+                <Download size={16} /> Save PDF
+              </button>
+              <button 
+                onClick={() => setShowInvoice(false)} 
+                className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 rounded font-black uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
+              >
+                New Sale
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @media print {
+          #pos-invoice {
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            z-index: 9999 !important;
+          }
+          body > *:not(#pos-invoice) {
+            display: none !important;
+          }
+          body {
+            background: white !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };

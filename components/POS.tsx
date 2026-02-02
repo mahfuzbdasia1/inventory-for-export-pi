@@ -139,13 +139,16 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
                 )}
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-center">
-                <p className="text-[9px] text-blue-600 font-bold uppercase truncate">{p.brand}</p>
+                <p className="text-[9px] text-blue-600 font-bold uppercase truncate">{p.brand} • {p.category}</p>
                 <h4 className="font-bold text-gray-800 text-xs sm:text-sm truncate">{p.name}</h4>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-sm font-black text-gray-900">৳{p.sellingPrice}</span>
-                  <span className={`text-[8px] px-1 py-0.5 rounded font-black hidden xs:inline-block ${p.currentStock > 10 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {p.currentStock} QTY
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[8px] text-gray-500 font-bold uppercase">Size: {p.size}</span>
+                    <span className={`text-[8px] px-1 py-0.5 rounded font-black ${p.currentStock > 10 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {p.currentStock} QTY
+                    </span>
+                  </div>
                 </div>
               </div>
             </button>
@@ -153,12 +156,11 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
         </div>
       </div>
 
-      {/* Cart & Checkout - Responsive Sidebar */}
+      {/* Cart & Checkout */}
       <div className={`
         fixed inset-x-0 bottom-0 bg-white border-t z-30 transition-all duration-300 lg:static lg:w-80 xl:w-96 lg:border-t-0 lg:flex lg:flex-col gap-4 print:hidden shadow-2xl lg:shadow-none
         ${isCartExpanded ? 'h-[80vh]' : 'h-16 lg:h-full'}
       `}>
-        {/* Toggle Cart for Mobile */}
         <button 
           onClick={() => setIsCartExpanded(!isCartExpanded)}
           className="lg:hidden w-full h-16 flex items-center justify-between px-4 bg-gray-900 text-white"
@@ -258,12 +260,15 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
             <div className="flex-1 overflow-y-auto print:overflow-visible" id="pos-invoice-content">
               <div className="p-6 sm:p-10 space-y-8 print:p-8">
                 <div className="text-center space-y-2">
-                  <div className="w-16 h-16 bg-black rounded mx-auto flex items-center justify-center text-white font-black text-2xl mb-4">
-                    {logoUrl ? <img src={logoUrl} className="w-full h-full object-cover" alt="logo" /> : appName.charAt(0)}
+                  <div className="w-16 h-16 bg-white rounded mx-auto flex items-center justify-center text-gray-900 font-black text-2xl mb-4 border border-gray-100">
+                    {logoUrl ? <img src={logoUrl} className="w-full h-full object-contain" alt="logo" /> : appName.charAt(0)}
                   </div>
                   <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">{appName}</h1>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{currentShowroom.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">{currentShowroom.location}</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Premium Shoe Store</p>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase space-y-0.5">
+                    <p>Phone: 01775672645</p>
+                    <p>House-49, Road No. 4, Dhaka 1230, Bangladesh</p>
+                  </div>
                 </div>
 
                 <div className="border-y border-dashed border-gray-200 py-4 grid grid-cols-2 gap-4 text-xs">
@@ -296,7 +301,7 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
                           <tr key={idx} className="text-gray-900 font-medium">
                             <td className="py-3">
                               <p className="font-bold">{prod?.name || 'Unknown Item'}</p>
-                              <p className="text-[9px] text-gray-400 uppercase">{prod?.brand}</p>
+                              <p className="text-[9px] text-gray-400 uppercase">{prod?.brand} • {prod?.category} • Size: {prod?.size}</p>
                             </td>
                             <td className="py-3 text-center">{item.quantity}</td>
                             <td className="py-3 text-right">৳{item.unitPrice.toLocaleString()}</td>
@@ -359,6 +364,9 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
 
       <style>{`
         @media print {
+          body > *:not(#pos-invoice) {
+            display: none !important;
+          }
           #pos-invoice {
             display: block !important;
             position: absolute !important;
@@ -366,17 +374,19 @@ const POS: React.FC<POSProps> = ({ products, stock, currentShowroom, onCompleteS
             left: 0 !important;
             width: 100% !important;
             max-width: none !important;
+            height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
             border: none !important;
             box-shadow: none !important;
             z-index: 9999 !important;
           }
-          body > *:not(#pos-invoice) {
-            display: none !important;
+          #pos-invoice-content {
+            overflow: visible !important;
+            height: auto !important;
           }
-          body {
-            background: white !important;
+          .print-hidden {
+            display: none !important;
           }
         }
       `}</style>

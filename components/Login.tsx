@@ -120,10 +120,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, appName, logoUrl, users }) => {
             </button>
           </form>
         </div>
-
-        <div className="mt-8 text-center">
-            <p className="text-xs text-gray-400 font-medium tracking-tight">System Default: password is username + '123'</p>
-        </div>
       </div>
     </div>
   );

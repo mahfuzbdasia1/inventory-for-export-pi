@@ -36,15 +36,15 @@ import StaffManagement from './components/StaffManagement';
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('soleerp_sidebar_collapsed') === 'true';
+    return localStorage.getItem('exportpi_sidebar_collapsed') === 'true';
   });
   
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('soleerp_auth') === 'true';
+    return localStorage.getItem('exportpi_auth') === 'true';
   });
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-      const saved = localStorage.getItem('soleerp_user_obj');
+      const saved = localStorage.getItem('exportpi_user_obj');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -63,35 +63,35 @@ const App: React.FC = () => {
     }
   };
 
-  const [users, setUsers] = useState<User[]>(() => loadArray('soleerp_users', MOCK_USERS));
+  const [users, setUsers] = useState<User[]>(() => loadArray('exportpi_users', MOCK_USERS));
   
-  const [staffRoles, setStaffRoles] = useState<StaffRole[]>(() => loadArray('soleerp_staff_roles', [
+  const [staffRoles, setStaffRoles] = useState<StaffRole[]>(() => loadArray('exportpi_staff_roles', [
     { id: 'r1', name: 'Store Manager', accessLevel: 'MANAGER' },
     { id: 'r2', name: 'Sales Executive', accessLevel: 'SELLER' },
     { id: 'r3', name: 'System Admin', accessLevel: 'ADMIN' },
   ]));
 
-  const [products, setProducts] = useState<Product[]>(() => loadArray('soleerp_products', INITIAL_PRODUCTS));
-  const [stock, setStock] = useState<StockItem[]>(() => loadArray('soleerp_stock', INITIAL_STOCK));
-  const [sales, setSales] = useState<Sale[]>(() => loadArray('soleerp_sales', MOCK_SALES));
-  const [expenses, setExpenses] = useState<Expense[]>(() => loadArray('soleerp_expenses', []));
-  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>(() => loadArray('soleerp_salaries', []));
-  const [showrooms, setShowrooms] = useState<Showroom[]>(() => loadArray('soleerp_showrooms', SHOWROOMS));
-  const [categories, setCategories] = useState<Category[]>(() => loadArray('soleerp_categories', INITIAL_CATEGORIES));
+  const [products, setProducts] = useState<Product[]>(() => loadArray('exportpi_products', INITIAL_PRODUCTS));
+  const [stock, setStock] = useState<StockItem[]>(() => loadArray('exportpi_stock', INITIAL_STOCK));
+  const [sales, setSales] = useState<Sale[]>(() => loadArray('exportpi_sales', MOCK_SALES));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadArray('exportpi_expenses', []));
+  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>(() => loadArray('exportpi_salaries', []));
+  const [showrooms, setShowrooms] = useState<Showroom[]>(() => loadArray('exportpi_showrooms', SHOWROOMS));
+  const [categories, setCategories] = useState<Category[]>(() => loadArray('exportpi_categories', INITIAL_CATEGORIES));
 
   const [vatRate, setVatRate] = useState<number>(() => {
-    const saved = localStorage.getItem('soleerp_vat_rate');
+    const saved = localStorage.getItem('exportpi_vat_rate');
     return saved ? Number(JSON.parse(saved)) : 5;
   });
   const [appName, setAppName] = useState<string>(() => {
-    return localStorage.getItem('soleerp_app_name') || 'SoleERP';
+    return localStorage.getItem('exportpi_app_name') || 'Export Pi';
   });
   const [logoUrl, setLogoUrl] = useState<string>(() => {
-    return localStorage.getItem('soleerp_logo_url') || '';
+    return localStorage.getItem('exportpi_logo_url') || '';
   });
 
   const [selectedShowroomId, setSelectedShowroomId] = useState<string>(() => {
-    const saved = localStorage.getItem('soleerp_selected_showroom');
+    const saved = localStorage.getItem('exportpi_selected_showroom');
     return saved && showrooms.some(s => s.id === saved) ? saved : (showrooms[0]?.id || '');
   });
 
@@ -101,27 +101,28 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
-  useEffect(() => localStorage.setItem('soleerp_users', JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem('soleerp_staff_roles', JSON.stringify(staffRoles)), [staffRoles]);
-  useEffect(() => localStorage.setItem('soleerp_products', JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem('soleerp_stock', JSON.stringify(stock)), [stock]);
-  useEffect(() => localStorage.setItem('soleerp_sales', JSON.stringify(sales)), [sales]);
-  useEffect(() => localStorage.setItem('soleerp_expenses', JSON.stringify(expenses)), [expenses]);
-  useEffect(() => localStorage.setItem('soleerp_salaries', JSON.stringify(salaryPayments)), [salaryPayments]);
-  useEffect(() => localStorage.setItem('soleerp_showrooms', JSON.stringify(showrooms)), [showrooms]);
-  useEffect(() => localStorage.setItem('soleerp_categories', JSON.stringify(categories)), [categories]);
-  useEffect(() => localStorage.setItem('soleerp_vat_rate', JSON.stringify(vatRate)), [vatRate]);
-  useEffect(() => localStorage.setItem('soleerp_app_name', appName), [appName]);
-  useEffect(() => localStorage.setItem('soleerp_logo_url', logoUrl), [logoUrl]);
-  useEffect(() => localStorage.setItem('soleerp_selected_showroom', selectedShowroomId), [selectedShowroomId]);
-  useEffect(() => localStorage.setItem('soleerp_sidebar_collapsed', isSidebarCollapsed.toString()), [isSidebarCollapsed]);
+  // Persistent Storage Hooks
+  useEffect(() => localStorage.setItem('exportpi_users', JSON.stringify(users)), [users]);
+  useEffect(() => localStorage.setItem('exportpi_staff_roles', JSON.stringify(staffRoles)), [staffRoles]);
+  useEffect(() => localStorage.setItem('exportpi_products', JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem('exportpi_stock', JSON.stringify(stock)), [stock]);
+  useEffect(() => localStorage.setItem('exportpi_sales', JSON.stringify(sales)), [sales]);
+  useEffect(() => localStorage.setItem('exportpi_expenses', JSON.stringify(expenses)), [expenses]);
+  useEffect(() => localStorage.setItem('exportpi_salaries', JSON.stringify(salaryPayments)), [salaryPayments]);
+  useEffect(() => localStorage.setItem('exportpi_showrooms', JSON.stringify(showrooms)), [showrooms]);
+  useEffect(() => localStorage.setItem('exportpi_categories', JSON.stringify(categories)), [categories]);
+  useEffect(() => localStorage.setItem('exportpi_vat_rate', JSON.stringify(vatRate)), [vatRate]);
+  useEffect(() => localStorage.setItem('exportpi_app_name', appName), [appName]);
+  useEffect(() => localStorage.setItem('exportpi_logo_url', logoUrl), [logoUrl]);
+  useEffect(() => localStorage.setItem('exportpi_selected_showroom', selectedShowroomId), [selectedShowroomId]);
+  useEffect(() => localStorage.setItem('exportpi_sidebar_collapsed', isSidebarCollapsed.toString()), [isSidebarCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('soleerp_auth', isAuthenticated.toString());
+    localStorage.setItem('exportpi_auth', isAuthenticated.toString());
     if (currentUser) {
-      localStorage.setItem('soleerp_user_obj', JSON.stringify(currentUser));
+      localStorage.setItem('exportpi_user_obj', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('soleerp_user_obj');
+      localStorage.removeItem('exportpi_user_obj');
     }
   }, [isAuthenticated, currentUser]);
 
@@ -139,12 +140,13 @@ const App: React.FC = () => {
       e.stopPropagation();
     }
     
-    const confirmLogout = window.confirm("Are you sure you want to log out of the system?");
-    if (confirmLogout) {
-      localStorage.setItem('soleerp_auth', 'false');
-      localStorage.removeItem('soleerp_user_obj');
+    if (window.confirm("Are you sure you want to log out of the system? Your data will remain safely stored.")) {
       setIsAuthenticated(false);
       setCurrentUser(null);
+      setIsSidebarOpen(false);
+      localStorage.setItem('exportpi_auth', 'false');
+      localStorage.removeItem('exportpi_user_obj');
+      window.location.hash = '#/';
     }
   };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Product, StockItem, Showroom, Category, UserRole } from '../types';
@@ -30,7 +31,11 @@ const Inventory: React.FC<InventoryProps> = ({
 }) => {
   const location = useLocation();
   const isAdmin = userRole === 'ADMIN';
+  const isManager = userRole === 'MANAGER';
   const isSeller = userRole === 'SELLER';
+  
+  // Managers and Admins can manage inventory
+  const canManageInventory = isAdmin || isManager;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -167,8 +172,14 @@ const Inventory: React.FC<InventoryProps> = ({
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAdmin) return;
-    if (window.confirm("Permanently delete this product from database?")) {
+    
+    // Authorization check
+    if (!canManageInventory) {
+      alert("Insufficient permissions: Only Admins or Managers can delete products.");
+      return;
+    }
+
+    if (window.confirm("CRITICAL ACTION: Are you sure you want to permanently delete this product? This will also wipe all associated stock records across all branches and cannot be undone.")) {
       setProducts(prev => prev.filter(p => p.id !== id));
       setStock(prev => prev.filter(s => s.productId !== id));
     }
@@ -182,7 +193,7 @@ const Inventory: React.FC<InventoryProps> = ({
           <p className="text-sm text-gray-500 font-medium">Monitor stock levels across all showroom branches.</p>
         </div>
         <div className="flex gap-2">
-           {!isSeller && (
+           {canManageInventory && (
             <button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all">
               <Plus size={16} /> Register Product
             </button>
@@ -273,11 +284,11 @@ const Inventory: React.FC<InventoryProps> = ({
                     </td>
                     {!isSeller && (
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setSelectedProduct(p); setShowPurchaseModal(true); }} className="px-2 py-1 bg-green-50 text-green-700 rounded text-[9px] font-black uppercase hover:bg-green-100 border border-green-200">Entry</button>
-                          {isAdmin && <button onClick={() => { setSelectedProduct(p); setShowTransferModal(true); }} className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-[9px] font-black uppercase hover:bg-orange-100 border border-orange-200">Transfer</button>}
-                          <button onClick={() => handleOpenEdit(p)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit size={14} /></button>
-                          {isAdmin && <button onClick={(e) => handleDelete(e, p.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
+                        <div className="flex justify-end gap-1 transition-opacity">
+                          <button onClick={() => { setSelectedProduct(p); setShowPurchaseModal(true); }} className="px-2 py-1 bg-green-50 text-green-700 rounded text-[9px] font-black uppercase hover:bg-green-100 border border-green-200 shadow-sm cursor-pointer transition-all active:scale-95">Entry</button>
+                          {isAdmin && <button onClick={() => { setSelectedProduct(p); setShowTransferModal(true); }} className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-[9px] font-black uppercase hover:bg-orange-100 border border-orange-200 shadow-sm cursor-pointer transition-all active:scale-95">Transfer</button>}
+                          <button onClick={() => handleOpenEdit(p)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-all active:scale-95" title="Edit Product"><Edit size={14} /></button>
+                          {canManageInventory && <button onClick={(e) => handleDelete(e, p.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-all active:scale-95 cursor-pointer" title="Delete Product"><Trash2 size={14} /></button>}
                         </div>
                       </td>
                     )}
@@ -295,28 +306,28 @@ const Inventory: React.FC<InventoryProps> = ({
           <div className="bg-white rounded shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
               <h2 className="font-black text-gray-900 uppercase tracking-tight">{showAddModal ? 'Register New Product' : 'Edit Product Details'}</h2>
-              <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+              <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveProduct} className="p-6 grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Model Name</label><input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 font-bold" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Brand</label><input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Category</label><select className="w-full border p-2 rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Size</label><input required className="w-full border p-2 rounded" value={formData.size} onChange={e => setFormData({...formData, size: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Color Variant</label><input required className="w-full border p-2 rounded" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Purchase Cost (৳)</label><input required type="number" className="w-full border p-2 rounded font-black text-red-600" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Selling Price (৳)</label><input required type="number" className="w-full border p-2 rounded font-black text-blue-600" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: Number(e.target.value)})} /></div>
-              <div className="col-span-2 space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Product Image URL</label><input className="w-full border p-2 rounded" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /></div>
+              <div className="col-span-2 space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Model Name</label><input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 font-bold text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Brand</label><input required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 text-sm" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Category</label><select className="w-full border p-2 rounded text-sm font-bold" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Size</label><input required className="w-full border p-2 rounded text-sm" value={formData.size} onChange={e => setFormData({...formData, size: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Color Variant</label><input required className="w-full border p-2 rounded text-sm" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Purchase Cost (৳)</label><input required type="number" className="w-full border p-2 rounded font-black text-red-600" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Selling Price (৳)</label><input required type="number" className="w-full border p-2 rounded font-black text-blue-600" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: Number(e.target.value)})} /></div>
+              <div className="col-span-2 space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Product Image URL</label><input className="w-full border p-2 rounded text-sm" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} /></div>
               
               {showAddModal && (
                 <>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Initial Stock Branch</label><select className="w-full border p-2 rounded" value={formData.initialShowroomId} onChange={e => setFormData({...formData, initialShowroomId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400">Initial Qty</label><input type="number" className="w-full border p-2 rounded" value={formData.initialQuantity} onChange={e => setFormData({...formData, initialQuantity: Number(e.target.value)})} /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Initial Stock Branch</label><select className="w-full border p-2 rounded text-sm font-bold" value={formData.initialShowroomId} onChange={e => setFormData({...formData, initialShowroomId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                  <div className="space-y-1"><label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Initial Qty</label><input type="number" className="w-full border p-2 rounded text-sm font-bold" value={formData.initialQuantity} onChange={e => setFormData({...formData, initialQuantity: Number(e.target.value)})} /></div>
                 </>
               )}
 
               <div className="col-span-2 pt-4 border-t flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="px-4 py-2 text-xs font-bold text-gray-500 uppercase cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black rounded shadow-lg shadow-blue-500/20 uppercase text-xs tracking-widest active:scale-95 transition-all">Save Record</button>
+                <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); }} className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-500 cursor-pointer hover:bg-gray-50 transition-all">Cancel</button>
+                <button type="submit" className="px-6 py-2 bg-blue-600 text-white font-black rounded shadow-lg shadow-blue-500/20 uppercase text-xs tracking-widest active:scale-95 transition-all cursor-pointer">Save Product</button>
               </div>
             </form>
           </div>
@@ -328,33 +339,33 @@ const Inventory: React.FC<InventoryProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b bg-orange-50 flex justify-between items-center text-orange-900">
-              <h2 className="font-black uppercase tracking-tight flex items-center gap-2"><ArrowRightLeft size={18} /> Internal Stock Transfer</h2>
-              <button onClick={() => setShowTransferModal(false)} className="text-orange-400 hover:text-orange-600"><X size={20} /></button>
+              <h2 className="font-black uppercase tracking-tight flex items-center gap-2 text-sm sm:text-base"><ArrowRightLeft size={18} /> Internal Stock Transfer</h2>
+              <button onClick={() => setShowTransferModal(false)} className="text-orange-400 hover:text-orange-600 cursor-pointer"><X size={20} /></button>
             </div>
             <form onSubmit={handleTransferSubmit} className="p-6 space-y-4">
               <div className="bg-orange-50/50 p-3 rounded border border-orange-100">
-                <p className="text-[10px] font-black text-orange-400 uppercase">Selected Product</p>
+                <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Selected Model</p>
                 <p className="font-bold text-gray-900">{selectedProduct.brand} {selectedProduct.name}</p>
-                <p className="text-[10px] font-bold text-gray-500">Current Global Stock: {getStockCount(selectedProduct.id)}</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-tighter">Current Global Pool: {getStockCount(selectedProduct.id)} units</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">From Branch</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">From Source</label>
                   <select className="w-full border p-2 rounded text-sm font-bold" value={transferData.fromId} onChange={e => setTransferData({...transferData, fromId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">To Branch</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">To Destination</label>
                   <select className="w-full border p-2 rounded text-sm font-bold" value={transferData.toId} onChange={e => setTransferData({...transferData, toId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">Quantity to Move</label>
-                <input type="number" min="1" required className="w-full border p-3 rounded text-xl font-black text-orange-600" value={transferData.quantity} onChange={e => setTransferData({...transferData, quantity: Number(e.target.value)})} />
-                <p className="text-[10px] text-gray-400">Available in source: {getStockCount(selectedProduct.id, transferData.fromId)}</p>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Quantity to Move</label>
+                <input type="number" min="1" required className="w-full border p-3 rounded text-xl font-black text-orange-600 focus:ring-1 focus:ring-orange-500 outline-none" value={transferData.quantity} onChange={e => setTransferData({...transferData, quantity: Number(e.target.value)})} />
+                <p className="text-[10px] font-black text-gray-400 uppercase mt-1 tracking-tighter">Available in source branch: {getStockCount(selectedProduct.id, transferData.fromId)} QTY</p>
               </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowTransferModal(false)} className="flex-1 py-2 text-xs font-black uppercase text-gray-500">Cancel</button>
-                <button type="submit" className="flex-[2] py-2 bg-orange-600 text-white font-black uppercase rounded shadow-lg shadow-orange-500/20 tracking-widest text-xs">Execute Transfer</button>
+              <div className="pt-4 flex gap-3 border-t">
+                <button type="button" onClick={() => setShowTransferModal(false)} className="flex-1 py-3 text-xs font-black uppercase tracking-widest text-gray-500 cursor-pointer hover:bg-gray-50 transition-all">Discard</button>
+                <button type="submit" className="flex-[2] py-3 bg-orange-600 text-white font-black uppercase rounded shadow-lg shadow-orange-500/20 tracking-widest text-xs active:scale-95 transition-all cursor-pointer">Execute Movement</button>
               </div>
             </form>
           </div>
@@ -366,25 +377,25 @@ const Inventory: React.FC<InventoryProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b bg-green-50 flex justify-between items-center text-green-900">
-              <h2 className="font-black uppercase tracking-tight flex items-center gap-2"><PackageOpen size={18} /> New Stock Entry (Purchase)</h2>
-              <button onClick={() => setShowPurchaseModal(false)} className="text-green-400 hover:text-green-600"><X size={20} /></button>
+              <h2 className="font-black uppercase tracking-tight flex items-center gap-2 text-sm sm:text-base"><PackageOpen size={18} /> Purchase Inward Entry</h2>
+              <button onClick={() => setShowPurchaseModal(false)} className="text-green-400 hover:text-green-600 cursor-pointer"><X size={20} /></button>
             </div>
             <form onSubmit={handlePurchaseSubmit} className="p-6 space-y-4">
               <div className="bg-green-50/50 p-3 rounded border border-green-100">
-                <p className="text-[10px] font-black text-green-400 uppercase">Restocking Product</p>
+                <p className="text-[10px] font-black text-green-400 uppercase tracking-widest">Model for Restocking</p>
                 <p className="font-bold text-gray-900">{selectedProduct.brand} {selectedProduct.name}</p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">Receiving Branch</label>
-                <select className="w-full border p-2 rounded text-sm font-bold" value={purchaseData.showroomId} onChange={e => setPurchaseData({...purchaseData, showroomId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Inward Destination (Branch)</label>
+                <select className="w-full border p-2.5 rounded text-sm font-bold" value={purchaseData.showroomId} onChange={e => setPurchaseData({...purchaseData, showroomId: e.target.value})}>{showrooms.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">Entry Quantity</label>
-                <input type="number" min="1" required className="w-full border p-3 rounded text-xl font-black text-green-600" value={purchaseData.quantity} onChange={e => setPurchaseData({...purchaseData, quantity: Number(e.target.value)})} />
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Entry Quantity (New Stock)</label>
+                <input type="number" min="1" required className="w-full border p-3 rounded text-xl font-black text-green-600 focus:ring-1 focus:ring-green-500 outline-none" value={purchaseData.quantity} onChange={e => setPurchaseData({...purchaseData, quantity: Number(e.target.value)})} />
               </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowPurchaseModal(false)} className="flex-1 py-2 text-xs font-black uppercase text-gray-500">Cancel</button>
-                <button type="submit" className="flex-[2] py-2 bg-green-600 text-white font-black uppercase rounded shadow-lg shadow-green-500/20 tracking-widest text-xs">Confirm Entry</button>
+              <div className="pt-4 flex gap-3 border-t">
+                <button type="button" onClick={() => setShowPurchaseModal(false)} className="flex-1 py-3 text-xs font-black uppercase tracking-widest text-gray-500 cursor-pointer hover:bg-gray-50 transition-all">Cancel</button>
+                <button type="submit" className="flex-[2] py-3 bg-green-600 text-white font-black uppercase rounded shadow-lg shadow-green-500/20 tracking-widest text-xs active:scale-95 transition-all cursor-pointer">Authorize Entry</button>
               </div>
             </form>
           </div>
